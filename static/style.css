@@ -1,0 +1,77 @@
+/* static/style.css */
+body {
+    font-family: Arial, sans-serif;
+    background: #f7f7f7;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 800px;
+    margin: 20px auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+h1, h2 {
+    text-align: center;
+    color: #333;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+}
+
+table, th, td {
+    border: 1px solid #ddd;
+}
+
+th, td {
+    padding: 8px;
+    text-align: center;
+}
+
+.delete-button {
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.delete-button:hover {
+    background: #c0392b;
+}
+
+.config-section {
+    margin-bottom: 20px;
+}
+
+.notification {
+    background: #2ecc71;
+    color: #fff;
+    padding: 10px;
+    text-align: center;
+    border-radius: 3px;
+    margin-bottom: 15px;
+}
+
+.log-section {
+    margin-top: 20px;
+    padding: 10px;
+    background: #fafafa;
+    border: 1px solid #ddd;
+}
+
+.log-div {
+    max-height: 300px;
+    overflow-y: scroll;
+    border: 1px solid #ddd;
+    padding: 10px;
+    background: #fff;
+    white-space: pre-wrap;
+}

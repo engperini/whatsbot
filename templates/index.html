@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Configuração do Server</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Configuração do Server</h1>
+        
+        <!-- Notificação via JavaScript -->
+        <div id="notification" class="notification" style="display:none;"></div>
+        
+        <form method="post" action="{{ url_for('index') }}">
+            <div class="config-section">
+                <h2>Configuração Global</h2>
+                <label>
+                    Habilitar Respostas Globais:
+                    <input type="checkbox" name="enable_responses" {% if config.enable_responses == 'true' %}checked{% endif %}>
+                </label>
+            </div>
+            
+            <div class="config-section">
+                <h2>Números Permitidos (ALLOWED CONTACT)</h2>
+                <table>
+                    <tr>
+                        <th>Número</th>
+                        <th>Nome</th>
+                        <th>Habilitado</th>
+                        <th>Ações</th>
+                    </tr>
+                    {% for contact in allowed_contacts %}
+                    <tr>
+                        <td>{{ contact.contact }}</td>
+                        <td>{{ contact.name }}</td>
+                        <td>
+                            <input type="checkbox" name="enabled_{{ contact.contact }}" {% if contact.enabled %}checked{% endif %}>
+                        </td>
+                        <td>
+                            <button type="submit" name="delete_contact" value="{{ contact.contact }}" class="delete-button">X</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                <label>Adicionar novo contato:</label><br>
+                <input type="text" name="new_contact" placeholder="Digite o número">
+                <input type="text" name="new_contact_name" placeholder="Digite o nome">
+            </div>
+            <br>
+            <button type="submit">Salvar Configurações</button>
+        </form>
+        
+        <div class="log-section">
+            <h2>Log de Mensagens Enviadas</h2>
+            <div class="log-div"><pre>{{ log_sent_content }}</pre></div>
+        </div>        
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+      // Exibe notificação se houver mensagem na URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const message = urlParams.get('message');
+      if (message) {
+          const notificationDiv = document.getElementById("notification");
+          notificationDiv.textContent = message;
+          notificationDiv.style.display = "block";
+          setTimeout(() => {
+              notificationDiv.style.display = "none";
+          }, 3000);
+      }
+    </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+5519971120828,5519971120828,true
+5511972353351,Cida,true
+553491360934,Madalena,true
+553497899470,Mirella Perini,true
+5511987773459,Arthur Perini,false
+5511986262725,Guilherme Valentini,false
