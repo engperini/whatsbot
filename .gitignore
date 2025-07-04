@@ -15,4 +15,4 @@ eggs/
 .idea/
 .vscode/
 *.log
-allowed_contacts
+allowed_contacts.txt
