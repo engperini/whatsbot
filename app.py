@@ -17,11 +17,11 @@ from myagents import process_llm
 load_dotenv()
 client = OpenAI()
 
-server_params = {
+""" server_params = {
     "command": "python",
     "args": ["server.py"],
     "env": os.environ.copy(),
-}
+} """
 
 app = Flask(__name__)
 
@@ -126,71 +126,75 @@ def get_log_filename(contact: str) -> str:
     return os.path.join(LOG_FOLDER, f"messages_{contact}.log")
 
 # Função para reconstruir o histórico (últimas 5 interações) a partir do log unificado
-def reconstruir_historico(contact: str):
-    conversation = []
+# def reconstruir_historico(contact: str):
+#     conversation = []
     
-    # Prompt inicial atualizado (Arthur como persona humana)
-    """ system_prompt = (
-        "Você é o Arthur. Responda sempre como se fosse o próprio Arthur, mantendo estilo objetivo, direto. Não pergunte, apenas responda "
-        "você nao deve oferecer ajuda, nao deve bater papo, apenas seja direto"
-        "Use frases curtas, sem emojis ou formalidades. Nunca mencione ser IA ou assistente ou automação. "
-        "Para dúvidas desconhecidas, pesquise na internet. Seja direto sem oferecer ajuda. "
-        "Use ferramentas quando necessário para dados em tempo real (horários, datas, notícias), sempre resumir as respostas de pesquisas."
-        "Se perguntarem 'quem é?', assuma que é o próprio Arthur respondendo de forma casual."
-    )
+#     # Prompt inicial atualizado (Arthur como persona humana)
+#     """ system_prompt = (
+#         "Você é o Arthur. Responda sempre como se fosse o próprio Arthur, mantendo estilo objetivo, direto. Não pergunte, apenas responda "
+#         "você nao deve oferecer ajuda, nao deve bater papo, apenas seja direto"
+#         "Use frases curtas, sem emojis ou formalidades. Nunca mencione ser IA ou assistente ou automação. "
+#         "Para dúvidas desconhecidas, pesquise na internet. Seja direto sem oferecer ajuda. "
+#         "Use ferramentas quando necessário para dados em tempo real (horários, datas, notícias), sempre resumir as respostas de pesquisas."
+#         "Se perguntarem 'quem é?', assuma que é o próprio Arthur respondendo de forma casual."
+#     )
     
-    conversation.append({
-        "role": "system",
-        "content": system_prompt
-    })
-     """
-    log_file = get_log_filename(contact)
-    print(log_file)
+#     conversation.append({
+#         "role": "system",
+#         "content": system_prompt
+#     })
+#      """
+#     log_file = get_log_filename(contact)
+#     print(log_file)
 
-    # Lê o log e adiciona últimas 5 interações
-    if os.path.exists(log_file):
-        with open(log_file, "r", encoding='utf-8') as f:
-            linhas = f.readlines()
+#     # Lê o log e adiciona últimas 5 interações
+#     if os.path.exists(log_file):
+#         with open(log_file, "r", encoding='utf-8') as f:
+#             linhas = f.readlines()
         
-        # Processa últimas 5 linhas mantendo ordem cronológica
-        for linha in linhas[-5:]:
-            try:
-                entry = json.loads(linha)
+#         # Processa últimas 5 linhas mantendo ordem cronológica
+#         for linha in linhas[-5:]:
+#             try:
+#                 entry = json.loads(linha)
                 
-                # Mensagem do usuário original
-                conversation.append({
-                    "role": "user",
-                    "content": entry.get("user_message", "").strip()
-                })
+#                 # Mensagem do usuário original
+#                 conversation.append({
+#                     "role": "user",
+#                     "content": entry.get("user_message", "").strip()
+#                 })
                 
-                # Resposta formatada como Arthur (persona humana)
-                conversation.append({
-                    "role": "assistant",
-                    "content": entry.get("assistant_response", "").replace("assistente", "").strip()
-                })
-            except json.JSONDecodeError as e:
-                print(f"Erro ao decodificar linha do log: {e}")
-                continue
+#                 # Resposta formatada como Arthur (persona humana)
+#                 conversation.append({
+#                     "role": "assistant",
+#                     "content": entry.get("assistant_response", "").replace("assistente", "").strip()
+#                 })
+#             except json.JSONDecodeError as e:
+#                 print(f"Erro ao decodificar linha do log: {e}")
+#                 continue
     
-    return conversation
+#     return conversation
 
-# OpenAI responses API com histórico reconstruído a partir do log unificado
-async def responder_whatsapp(mensagem: str, nome_remetente: str) -> str:
+# # OpenAI responses API com histórico reconstruído a partir do log unificado
+# async def responder_whatsapp(mensagem: str, nome_remetente: str) -> str:
     
-    conversation = reconstruir_historico(nome_remetente)
-    # Adiciona uma mensagem informando o nome do remetente (caso queira que o modelo saiba)
-    conversation.append({
-       "role": "system",
-       "content": f"O usuário que envia a mensagem se chama {nome_remetente}. "
-    })
-    #Adiciona a nova mensagem do usuário
-    conversation.append({
-        "role": "user",
-        "content": mensagem
-    })
+#     conversation = reconstruir_historico(nome_remetente)
+#     # Adiciona uma mensagem informando o nome do remetente (caso queira que o modelo saiba)
+#     conversation.append({
+#        "role": "system",
+#        "content": f"O usuário que envia a mensagem se chama {nome_remetente}. "
+#     })
+#     #Adiciona a nova mensagem do usuário
+#     conversation.append({
+#         "role": "user",
+#         "content": mensagem
+#     })
 
-    async with MCPServerStdio(params=server_params) as mcp_server:
+    
+    
+    """ async with MCPServerStdio(params=server_params) as mcp_server:
+        # Obtém as ferramentas disponíveis do MCPServer
 
+        
         # Exemplo: listar ferramentas disponíveis
         mcp_tools = await mcp_server.list_tools()
         print("Ferramentas disponíveis:", mcp_tools)
@@ -213,7 +217,7 @@ async def responder_whatsapp(mensagem: str, nome_remetente: str) -> str:
     #resposta = response.choices[0].message.content #chat api
     print(resposta)
     return resposta
-
+ """
 # Interface de configuração – rota principal
 @app.route("/", methods=["GET", "POST"])
 def index():
