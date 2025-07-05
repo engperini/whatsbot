@@ -1,1 +1,2 @@
 enable_responses=true
+enable_group_responses=true

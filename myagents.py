@@ -88,7 +88,7 @@ async def process_llm(mensagem: str, nome_remetente: str, remetente: str):
         agent = Agent(
             name="Assistant",
             instructions=instructions,
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             tools=[WebSearchTool()],
             mcp_servers=[mcp_server],
             model_settings=ModelSettings(tool_choice="auto"),

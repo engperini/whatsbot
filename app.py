@@ -105,7 +105,10 @@ allowed_contacts = load_allowed_contacts()
 
 # Funções para gerenciar configuração global
 def load_config():
-    config = {"enable_responses": "true"}
+    config = {
+        "enable_responses": "true",
+        "enable_group_responses": "true"
+        }
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as f:
             for line in f:
@@ -125,99 +128,6 @@ def get_log_filename(contact: str) -> str:
     # Gera o nome do arquivo na pasta definida para logs
     return os.path.join(LOG_FOLDER, f"messages_{contact}.log")
 
-# Função para reconstruir o histórico (últimas 5 interações) a partir do log unificado
-# def reconstruir_historico(contact: str):
-#     conversation = []
-    
-#     # Prompt inicial atualizado (Arthur como persona humana)
-#     """ system_prompt = (
-#         "Você é o Arthur. Responda sempre como se fosse o próprio Arthur, mantendo estilo objetivo, direto. Não pergunte, apenas responda "
-#         "você nao deve oferecer ajuda, nao deve bater papo, apenas seja direto"
-#         "Use frases curtas, sem emojis ou formalidades. Nunca mencione ser IA ou assistente ou automação. "
-#         "Para dúvidas desconhecidas, pesquise na internet. Seja direto sem oferecer ajuda. "
-#         "Use ferramentas quando necessário para dados em tempo real (horários, datas, notícias), sempre resumir as respostas de pesquisas."
-#         "Se perguntarem 'quem é?', assuma que é o próprio Arthur respondendo de forma casual."
-#     )
-    
-#     conversation.append({
-#         "role": "system",
-#         "content": system_prompt
-#     })
-#      """
-#     log_file = get_log_filename(contact)
-#     print(log_file)
-
-#     # Lê o log e adiciona últimas 5 interações
-#     if os.path.exists(log_file):
-#         with open(log_file, "r", encoding='utf-8') as f:
-#             linhas = f.readlines()
-        
-#         # Processa últimas 5 linhas mantendo ordem cronológica
-#         for linha in linhas[-5:]:
-#             try:
-#                 entry = json.loads(linha)
-                
-#                 # Mensagem do usuário original
-#                 conversation.append({
-#                     "role": "user",
-#                     "content": entry.get("user_message", "").strip()
-#                 })
-                
-#                 # Resposta formatada como Arthur (persona humana)
-#                 conversation.append({
-#                     "role": "assistant",
-#                     "content": entry.get("assistant_response", "").replace("assistente", "").strip()
-#                 })
-#             except json.JSONDecodeError as e:
-#                 print(f"Erro ao decodificar linha do log: {e}")
-#                 continue
-    
-#     return conversation
-
-# # OpenAI responses API com histórico reconstruído a partir do log unificado
-# async def responder_whatsapp(mensagem: str, nome_remetente: str) -> str:
-    
-#     conversation = reconstruir_historico(nome_remetente)
-#     # Adiciona uma mensagem informando o nome do remetente (caso queira que o modelo saiba)
-#     conversation.append({
-#        "role": "system",
-#        "content": f"O usuário que envia a mensagem se chama {nome_remetente}. "
-#     })
-#     #Adiciona a nova mensagem do usuário
-#     conversation.append({
-#         "role": "user",
-#         "content": mensagem
-#     })
-
-    
-    
-    """ async with MCPServerStdio(params=server_params) as mcp_server:
-        # Obtém as ferramentas disponíveis do MCPServer
-
-        
-        # Exemplo: listar ferramentas disponíveis
-        mcp_tools = await mcp_server.list_tools()
-        print("Ferramentas disponíveis:", mcp_tools)
-
-        response = client.responses.create(
-            model="gpt-4o-mini",
-            input=conversation,
-            #text={"format": {"type": "text"}},
-            reasoning={},
-            tools=[{"type": "web_search_preview","search_context_size": "low"},],
-            #tools=([t["schema"] for t in mcp_tools.values()] if len(mcp_tools) > 0 else None),
-            temperature=0.5,
-            max_output_tokens=2048,
-            #max_tokens=2048,
-            top_p=1,
-            store=True,
-            
-        )
-    resposta = response.output_text #response api
-    #resposta = response.choices[0].message.content #chat api
-    print(resposta)
-    return resposta
- """
 # Interface de configuração – rota principal
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -227,6 +137,9 @@ def index():
         global_enable = request.form.get("enable_responses", "off")
         config["enable_responses"] = "true" if global_enable == "on" else "false"
         
+        group_enable = request.form.get("enable_group_responses", "off")
+        config["enable_group_responses"] = "true" if group_enable == "on" else "false"
+
         # Atualiza cada contato individual (checkbox com nome: enabled_<número>)
         for c in allowed_contacts:
             checkbox_name = f"enabled_{c['contact']}"
@@ -299,21 +212,30 @@ def webhook():
     # main variables
     chat_id = payload.get("from")
     message_id = payload.get("id")
-    participant = payload.get("participant")
+    participant = participant = payload.get("participant") or _data.get("author")
     texto = payload.get("body")
 
-    
     # alternative variables
     remetente = chat_id.split('@')[0]
     mensagem_recebida = texto
     from_name = _data.get("notifyName", "Desconhecido")
 
+    # 1) detecta grupo e remetente puro
+    if chat_id.endswith("@g.us") and participant:
+        remetente = participant.split("@")[0]
+        is_group   = True
+    else:
+        remetente = chat_id.split("@")[0]
+        is_group   = False
+
+    print( f"Mensagem recebida de {from_name} chat_id={chat_id}")
 
     # ignore bot messages starting with "🤖:"
     if mensagem_recebida.strip().startswith("🤖:"):
         return jsonify({"status": "ignorado", "motivo": "mensagem do próprio bot"}), 200
 
     bot_number = data.get("me", {}).get("id", "").split('@')[0]
+    
     if remetente == bot_number:
         return jsonify({"status": "ignorado", "motivo": "mensagem própria"}), 200
 
@@ -339,6 +261,11 @@ def webhook():
     contact_entry = next((c for c in allowed_contacts if c["contact"] == remetente), None)
     autorizado = contact_entry is not None and contact_entry["enabled"]
     respostas_ativas = config.get("enable_responses", "true") == "true"
+    
+    if is_group:
+        respostas_ativas = respostas_ativas and config.get("enable_group_responses", "true") == "true"
+
+    
     
     if autorizado and respostas_ativas:
         if mensagem_recebida:

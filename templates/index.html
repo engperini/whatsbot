@@ -2,33 +2,40 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Configuração do Server</title>
+    <title>WhatsApp Bot Server</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Configuração do Server</h1>
+        <h1>WhatsApp Bot Server Configuration</h1>
         
         <!-- Notificação via JavaScript -->
         <div id="notification" class="notification" style="display:none;"></div>
         
         <form method="post" action="{{ url_for('index') }}">
             <div class="config-section">
-                <h2>Configuração Global</h2>
+                <h2>Global Answer</h2>
                 <label>
-                    Habilitar Respostas Globais:
+                    Enable Personal Responses:
                     <input type="checkbox" name="enable_responses" {% if config.enable_responses == 'true' %}checked{% endif %}>
+                </label>
+            </div>
+            <div class="config-section">
+                <h2>Group Configuration</h2>
+                <label>
+                    Enable Group Responses:
+                    <input type="checkbox" name="enable_group_responses" {% if config.enable_group_responses == 'true' %}checked{% endif %}>
                 </label>
             </div>
             
             <div class="config-section">
-                <h2>Números Permitidos (ALLOWED CONTACT)</h2>
+                <h2>ALLOWED CONTACTS</h2>
                 <table>
                     <tr>
-                        <th>Número</th>
-                        <th>Nome</th>
-                        <th>Habilitado</th>
-                        <th>Ações</th>
+                        <th>Number</th>
+                        <th>Name</th>
+                        <th>Enabled</th>
+                        <th>Actions</th>
                     </tr>
                     {% for contact in allowed_contacts %}
                     <tr>
@@ -43,22 +50,22 @@
                     </tr>
                     {% endfor %}
                 </table>
-                <label>Adicionar novo contato:</label><br>
-                <input type="text" name="new_contact" placeholder="Digite o número">
-                <input type="text" name="new_contact_name" placeholder="Digite o nome">
+                <label>Add New Contact:</label><br>
+                <input type="text" name="new_contact" placeholder="Enter number">
+                <input type="text" name="new_contact_name" placeholder="Enter name">
             </div>
             <br>
-            <button type="submit">Salvar Configurações</button>
+            <button type="submit">Save Settings</button>
         </form>
         
         <div class="log-section">
-            <h2>Log de Mensagens Enviadas</h2>
+            <h2>Sent Messages Log</h2>
             <div class="log-div"><pre>{{ log_sent_content }}</pre></div>
         </div>        
     </div>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
-      // Exibe notificação se houver mensagem na URL
+      // Show notification if there's a message in the URL
       const urlParams = new URLSearchParams(window.location.search);
       const message = urlParams.get('message');
       if (message) {
