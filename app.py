@@ -13,6 +13,7 @@ import tempfile
 
 # Importa o módulo agents
 from audio_agent import transcribe_via_agent
+from audio_agent import analyze_image_via_agent
 from myagents import process_llm
 
 
@@ -207,6 +208,23 @@ def webhook():
 
                 texto = transcribe_via_agent(audio_bytes)
                 print(f"Transcrição concluída: {texto}")
+
+                os.unlink(tmp_path)
+            
+            if msg_type in ("image", "video", "document"):
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                tmp.write(media_bytes)
+                tmp_path = tmp.name
+                tmp.close()
+
+                print(f"Analisando imagem de {chat_id} ({message_id})...")
+
+                # Análise de imagem: lê bytes e envia ao Agent
+                with open(tmp_path, "rb") as f:
+                    image_bytes = f.read()
+
+                texto = analyze_image_via_agent(image_bytes)
+                print(f"Análise concluída: {texto}")
 
                 os.unlink(tmp_path)
 
