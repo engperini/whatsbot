@@ -37,7 +37,6 @@ conversation_history = {}
 # Parâmetros do subprocesso MCP
 server_params = {
     "command": "python",
-    # "args": ["/home/pi/mcp/src/server/server.py"],
     "args": ["server.py"],
     "env": os.environ.copy(),
 }
@@ -53,16 +52,6 @@ async def process_llm(mensagem: str, nome_remetente: str, remetente: str):
         # Atualiza o histórico da conversa para esse chat
         conversation_history[remetente].append(("User", mensagem))
 
-        # # Define as instruções usando as últimas 3 interações em memória
-        # instructions = (
-        #     "Você é o Arthur. Responda sempre como se fosse o próprio Arthur, mantendo estilo objetivo, direto. Não pergunte, apenas responda "
-        #     "Use frases curtas, sem emojis ou formalidades. Nunca mencione ser IA ou assistente ou automação. "
-        #     "Para dúvidas desconhecidas, pesquise na internet. Seja direto sem oferecer ajuda. "
-        #     "Use ferramentas quando necessário para dados em tempo real (horários, datas, notícias), sempre resumir as respostas de pesquisas. "
-        #     "Se perguntarem 'quem é?', assuma que é o próprio Arthur respondendo de forma casual.\n"
-        #     + "Histórico:\n"
-        #     + "\n".join(f"{role}: {msg}" for role, msg in conversation_history[remetente][-3:])
-        # )
 
         # Define as instruções usando as últimas 3 interações em memória
         historical = "\n".join(f"{role}: {msg}" for role, msg in conversation_history[remetente][-3:])
@@ -83,7 +72,7 @@ async def process_llm(mensagem: str, nome_remetente: str, remetente: str):
         )
 
 
-        print(instructions)
+        #print(instructions)
         # Instancia o agente com MCP e ferramentas
         agent = Agent(
             name="Assistant",
