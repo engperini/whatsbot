@@ -17,3 +17,5 @@ eggs/
 .vscode/
 *.log
 allowed_contacts.txt
+token.json
+credentials.json
