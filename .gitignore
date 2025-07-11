@@ -18,4 +18,6 @@ eggs/
 *.log
 allowed_contacts.txt
 token.json
+cal_token.json
 credentials.json
+drive_token.json

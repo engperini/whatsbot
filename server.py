@@ -1,4 +1,5 @@
 #mcp server.py
+import datetime
 from mcp.server.fastmcp import FastMCP
 import httpx
 import os
@@ -30,6 +31,22 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.send',
 ]
+
+CAL_CREDENTIALS = os.getenv('GOOGLE_CAL_CREDENTIALS_JSON', GMAIL_CREDENTIALS)
+CAL_TOKEN = os.getenv('GOOGLE_CAL_TOKEN_JSON', 'cal_token.json')
+CAL_SCOPES = [
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/calendar.events'
+]
+
+DRIVE_CREDENTIALS = os.getenv('GOOGLE_DRIVE_CREDENTIALS_JSON', GMAIL_CREDENTIALS)
+DRIVE_TOKEN = os.getenv('GOOGLE_DRIVE_TOKEN_JSON', 'drive_token.json')
+DRIVE_SCOPES = [
+    'https://www.googleapis.com/auth/drive.metadata.readonly',
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/drive',  # full access
+    
+]   
 
 #create server
 mcp = FastMCP("mcp_server_pi")
@@ -185,7 +202,143 @@ async def send_gmail(to: str, subject: str, body: str) -> str:
     sent = gmail_service.send_message(to, subject, body)
     return f"Email enviado ID: {sent.get('id')}"
 
-# Se quiser adicionar Calendar e Drive, segue mesmo padrão... 
+# ------------------------- End Gmail Service ------------------------
+
+# ------------------------- Calendar Service -------------------------
+class CalendarService:
+    def __init__(self):
+        self.creds = None
+        if os.path.exists(CAL_TOKEN):
+            self.creds = Credentials.from_authorized_user_file(CAL_TOKEN, CAL_SCOPES)
+        if not self.creds or not self.creds.valid:
+            if self.creds and self.creds.expired and self.creds.refresh_token:
+                self.creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(CAL_CREDENTIALS, CAL_SCOPES)
+                self.creds = flow.run_local_server(port=0)
+            with open(CAL_TOKEN, 'w') as t:
+                t.write(self.creds.to_json())
+        self.service = build('calendar', 'v3', credentials=self.creds)
+
+    def list_events(self, calendar_id: str = 'primary', max_results: int = 10) -> List[Dict]:
+        now = datetime.datetime.utcnow().isoformat() + 'Z'
+        events = self.service.events().list(
+            calendarId=calendar_id, timeMin=now,
+            maxResults=max_results, singleEvents=True,
+            orderBy='startTime'
+        ).execute().get('items', [])
+        return events
+
+    def get_event(self, calendar_id: str, event_id: str) -> Dict:
+        return self.service.events().get(calendarId=calendar_id, eventId=event_id).execute()
+
+    def create_event(self, calendar_id: str, event: Dict) -> Dict:
+        return self.service.events().insert(calendarId=calendar_id, body=event).execute()
+
+calendar_service = CalendarService()
+
+@mcp.tool()
+async def list_calendar_events(max_results: int = 5) -> str:
+    evs = calendar_service.list_events(max_results=max_results)
+    if not evs:
+        return "Nenhum evento futuro encontrado."
+    lines = []
+    for e in evs:
+        start = e['start'].get('dateTime', e['start'].get('date'))
+        lines.append(f"{e['summary']} @ {start} (ID: {e['id']})")
+    return "\n".join(lines)
+
+@mcp.tool()
+async def get_calendar_event(event_id: str, calendar_id: str = 'primary') -> str:
+    e = calendar_service.get_event(calendar_id, event_id)
+    start = e['start'].get('dateTime', e['start'].get('date'))
+    return f"{e['summary']}\nStart: {start}\nDescription: {e.get('description','')}"
+
+@mcp.tool()
+async def create_calendar_event(calendar_id: str, summary: str, start: str, end: str, description: str = '', time_zone: str = 'UTC', attendees: List[str] = None) -> str:
+    """Cria um evento no Google Calendar incluindo convidados"""
+    
+    event = {
+        'summary': summary,
+        'description': description,
+        'start': {'dateTime': start, 'timeZone': time_zone},
+        'end':   {'dateTime': end,   'timeZone': time_zone}
+    }
+    if attendees:
+        event['attendees'] = [{'email': email} for email in attendees]
+
+    ev = calendar_service.create_event(calendar_id, event)
+    return f"Evento criado: {ev.get('id')}"
+
+# ------------------------- End Calendar Service -------------------------
+
+# google drive service
+class GoogleDriveService:
+    def __init__(self):
+        self.creds = None
+        if os.path.exists(DRIVE_TOKEN):
+            self.creds = Credentials.from_authorized_user_file(DRIVE_TOKEN, DRIVE_SCOPES)
+        if not self.creds or not self.creds.valid:
+            if self.creds and self.creds.expired and self.creds.refresh_token:
+                self.creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(DRIVE_CREDENTIALS, DRIVE_SCOPES)
+                self.creds = flow.run_local_server(port=8080)
+            with open(DRIVE_TOKEN, 'w') as t:
+                t.write(self.creds.to_json())
+        self.service = build('drive', 'v3', credentials=self.creds)
+
+    def list_files(self, query: str = '', max_results: int = 10) -> List[Dict]:
+        results = self.service.files().list(
+            q=query,
+            pageSize=max_results,
+            fields="nextPageToken, files(id, name)"
+        ).execute()
+        return results.get('files', [])
+    
+    def get_file(self, file_id: str) -> Dict:
+        """Get file metadata by ID"""
+        return self.service.files().get(fileId=file_id, fields='id, name, mimeType').execute()
+    
+    def download_file(self, file_id: str) -> bytes:
+        """Download file content by ID"""
+        request = self.service.files().get_media(fileId=file_id)
+        fh = httpx.stream(request)
+        return fh.content
+    
+# ------------------------- Google Drive Service -------------------------
+drive_service = GoogleDriveService()
+
+@mcp.tool()
+async def list_drive_files(query: str = '', max_results: int = 5) -> str:
+    """List files in Google Drive matching the query"""
+    files = drive_service.list_files(query, max_results)
+    if not files:
+        return "Nenhum arquivo encontrado."
+    lines = [f"{f['name']} (ID: {f['id']})" for f in files]
+    return "\n".join(lines) 
+
+@mcp.tool()
+async def get_drive_file(file_id: str) -> str:
+    """Get file metadata by ID"""
+    file_info = drive_service.get_file(file_id)
+    return f"Nome: {file_info['name']}\nID: {file_info['id']}\nTipo: {file_info['mimeType']}"
+
+@mcp.tool()
+async def download_drive_file(file_id: str) -> str:
+    """Download file content by ID"""
+    content = drive_service.download_file(file_id)
+    if not content:
+        return "Arquivo não encontrado ou vazio."
+    
+    # Save to a temporary file
+    temp_filename = f"temp_{file_id}"
+    with open(temp_filename, 'wb') as f:
+        f.write(content)
+    
+    return f"Arquivo baixado e salvo como {temp_filename}"
+
+# ------------------------- End Google Drive Service -------------------------
 
 # Add a dynamic greeting resource
 @mcp.resource("greeting://{name}")
