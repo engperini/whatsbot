@@ -292,13 +292,25 @@ class GoogleDriveService:
         results = self.service.files().list(
             q=query,
             pageSize=max_results,
-            fields="nextPageToken, files(id, name)"
+            fields="nextPageToken, files(id, name, mimeType, webViewLink)"
         ).execute()
         return results.get('files', [])
     
     def get_file(self, file_id: str) -> Dict:
-        """Get file metadata by ID"""
-        return self.service.files().get(fileId=file_id, fields='id, name, mimeType').execute()
+        """Get file metadata by ID, including shareable link"""
+        return self.service.files().get(
+            fileId=file_id, 
+            fields='id, name, mimeType, webViewLink'
+        ).execute()
+    
+    def make_file_public(self, file_id: str):
+        """Set file permission to anyone with the link can view"""
+        self.service.permissions().create(
+            fileId=file_id,
+            body={"role": "reader", "type": "anyone"},
+            fields="id"
+        ).execute()
+    
     
     def download_file(self, file_id: str) -> bytes:
         """Download file content by ID"""
@@ -324,19 +336,30 @@ async def get_drive_file(file_id: str) -> str:
     file_info = drive_service.get_file(file_id)
     return f"Nome: {file_info['name']}\nID: {file_info['id']}\nTipo: {file_info['mimeType']}"
 
+# @mcp.tool()
+# async def download_drive_file(file_id: str) -> str:
+#     """Download file content by ID"""
+#     content = drive_service.download_file(file_id)
+#     if not content:
+#         return "Arquivo não encontrado ou vazio."
+    
+#     # Save to a temporary file
+#     temp_filename = f"temp_{file_id}"
+#     with open(temp_filename, 'wb') as f:
+#         f.write(content)
+    
+#     return f"Arquivo baixado e salvo como {temp_filename}"
+
 @mcp.tool()
 async def download_drive_file(file_id: str) -> str:
-    """Download file content by ID"""
-    content = drive_service.download_file(file_id)
-    if not content:
-        return "Arquivo não encontrado ou vazio."
-    
-    # Save to a temporary file
-    temp_filename = f"temp_{file_id}"
-    with open(temp_filename, 'wb') as f:
-        f.write(content)
-    
-    return f"Arquivo baixado e salvo como {temp_filename}"
+    """Return a shareable Google Drive link for the file"""
+    file_info = drive_service.get_file(file_id)
+    # Make sure the file is public
+    drive_service.make_file_public(file_id)
+    link = file_info.get('webViewLink')
+    if not link:
+        return "Não foi possível gerar o link do arquivo."
+    return f"Link para acessar o arquivo: {link}"
 
 # ------------------------- End Google Drive Service -------------------------
 

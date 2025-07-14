@@ -176,7 +176,57 @@ def webhook():
     msg_type  = _data.get("type")
     
 
-    if payload.get("hasMedia"):
+
+
+    # evita duplicatas
+    if message_id in mensagens_processadas:
+        return jsonify({"status":"ignorado","motivo":"mensagem duplicada"}),200
+    mensagens_processadas.add(message_id)
+
+    # ignora mensagens do bot
+    if texto.startswith("🤖:"):
+        return jsonify({"status":"ignorado","motivo":"mensagem do próprio bot"}),200
+    
+    bot_num = data.get("me",{}).get("id","").split("@")[0]
+
+    # detecta grupo
+    is_group = chat_id.endswith("@g.us") and bool(participant)
+    
+    # define remetente puro
+    if is_group:
+        remetente = participant.split("@")[0]
+    else:
+        remetente = chat_id.split("@")[0]
+
+    if remetente == bot_num:
+        return jsonify({"status":"ignorado","motivo":"mensagem própria"}),200
+
+
+
+    # log entry base
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = {
+        "from": remetente,
+        "from_name": from_name,
+        "to": payload.get("to",""),
+        "type": _data.get("type",""),
+        "user_message": texto,
+        "assistant_response": "",
+        "timestamp": timestamp
+    }
+
+    # ————————————— LÓGICA DE DECISÃO UNIFICADA —————————————
+    contact_entry = next((c for c in allowed_contacts if c["contact"] == remetente), None)
+    autorizado    = bool(contact_entry and contact_entry["enabled"])
+    global_on     = (config.get("enable_responses") == "true")
+    group_on      = (config.get("enable_group_responses") == "true")
+    devo_responder = autorizado and global_on and (not is_group or group_on) #and bool(texto)
+    # ———————————————————————————————————————————————————————————
+
+    print(f"Recebido de {from_name}: {texto}, participant: {participant}, is_group: {is_group}")
+
+    # Verificar se tem midia e se deve responder apenas para autorizado
+    if payload.get("hasMedia") and devo_responder:
         media_info = payload.get("media") or {}
         mimetype = media_info.get("mimetype", "")
         media_url = media_info.get("url")
@@ -227,53 +277,6 @@ def webhook():
                 print(f"Análise concluída: {texto}")
 
                 os.unlink(tmp_path)
-
-    # evita duplicatas
-    if message_id in mensagens_processadas:
-        return jsonify({"status":"ignorado","motivo":"mensagem duplicada"}),200
-    mensagens_processadas.add(message_id)
-
-    # ignora mensagens do bot
-    if texto.startswith("🤖:"):
-        return jsonify({"status":"ignorado","motivo":"mensagem do próprio bot"}),200
-    
-    bot_num = data.get("me",{}).get("id","").split("@")[0]
-
-    # detecta grupo
-    is_group = chat_id.endswith("@g.us") and bool(participant)
-    
-    # define remetente puro
-    if is_group:
-        remetente = participant.split("@")[0]
-    else:
-        remetente = chat_id.split("@")[0]
-
-    if remetente == bot_num:
-        return jsonify({"status":"ignorado","motivo":"mensagem própria"}),200
-
-
-
-    # log entry base
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = {
-        "from": remetente,
-        "from_name": from_name,
-        "to": payload.get("to",""),
-        "type": _data.get("type",""),
-        "user_message": texto,
-        "assistant_response": "",
-        "timestamp": timestamp
-    }
-
-    # ————————————— LÓGICA DE DECISÃO UNIFICADA —————————————
-    contact_entry = next((c for c in allowed_contacts if c["contact"] == remetente), None)
-    autorizado    = bool(contact_entry and contact_entry["enabled"])
-    global_on     = (config.get("enable_responses") == "true")
-    group_on      = (config.get("enable_group_responses") == "true")
-    devo_responder = autorizado and global_on and (not is_group or group_on) and bool(texto)
-    # ———————————————————————————————————————————————————————————
-
-    print(f"Recebido de {from_name}: {texto}, participant: {participant}, is_group: {is_group}")
 
     if devo_responder:
         send_seen(chat_id=chat_id, message_id=message_id, participant=participant)
