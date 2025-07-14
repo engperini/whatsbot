@@ -1,133 +1,146 @@
-## Instructions ##
+# WhatsBot - Guia de Instalação e Uso
 
-WAHA Whatsapp Server Configuration
+Este projeto integra um agente conversacional (Arthur) ao WhatsApp via WAHA, com suporte a múltiplas ferramentas (Google Drive, Gmail, Calendar, clima, web search, etc). O bot responde automaticamente, usando contexto e histórico, e pode ser facilmente customizado.
 
-First time docker commands
+---
 
+## 1. Pré-requisitos
+
+- **Raspberry Pi ou Linux**
+- **Python 3.11+**
+- **Docker**
+- **Git**
+
+---
+
+## 2. Clonando o Repositório
+
+```bash
+git clone https://github.com/seu-usuario/seu-repo.git
+cd seu-repo
+```
+
+---
+
+## 3. Configurando o Ambiente Virtual
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+---
+
+## 4. Instalando o Docker
+
+```bash
+sudo apt-get update
 sudo apt-get install ca-certificates curl
-
 sudo install -m 0755 -d /etc/apt/keyrings
-
 sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-
 sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io
+```
 
-pi@raspberrypi:~ $ echo   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+---
 
-pi@raspberrypi:~ $   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" |   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+## 5. Baixando e Rodando o WAHA
 
-
-sudo apt-get install ./docker-desktop-amd64.deb
+```bash
 docker pull devlikeapro/waha:arm
 docker tag devlikeapro/waha:arm devlikeapro/waha
-
-
-Start Container
 docker run -it -p 3000:3000/tcp devlikeapro/waha
+```
 
-Webhook configuration at WAHA Dashboard
-'http://yourserverip:3000/webhook
+---
 
-Eventsconfiguration
-'messages'
-'messages.any'
-Note: the current python app.py filters only 'messages' event
+## 6. Configurando o Webhook no WAHA
 
-# Webhook App.py Functions
+No painel do WAHA, configure o webhook para apontar para seu servidor:
 
-Project App MCP Chatbot Folder
-'~/mcp/whatsserver'
+```
+http://<SEU_IP>:3000/webhook
+```
 
-Activate the Virtual Env
- source env/bin/activate
+**Eventos recomendados:**
+- `messages`
+- `messages.any`
 
+> **Nota:** O app Python atualmente filtra apenas o evento `messages`.
 
-Execute:
+---
+
+## 7. Inicializando o Bot
+
+Ative o ambiente virtual:
+
+```bash
+source venv/bin/activate
+```
+
+Execute o servidor Flask:
+
+```bash
 python app.py
+```
 
-# WhatsServer Functions
+---
 
-This README provides an overview of the functions utilized in the `app.py` file of the WhatsServer project.
+## 8. Estrutura e Funções dos Arquivos
 
-## Functions
+### `app.py` (servidor principal)
+- **`send_message(chat_id, text)`**: Envia mensagem para um chat.
+- **`send_seen(chat_id, message_id, participant)`**: Marca mensagem como lida.
+- **`typing(chat_id, seconds)`**: Simula digitação.
+- **`load_allowed_contacts()` / `save_allowed_contacts(contacts)`**: Gerencia contatos autorizados.
+- **`load_config()` / `save_config(config)`**: Gerencia configurações globais.
+- **`get_log_filename(contact)`**: Gera caminho do log para um contato.
+- **`reconstruir_historico(contact)`**: Lê últimas interações do log.
+- **`responder_whatsapp(mensagem, nome_remetente)`**: Gera resposta usando o agente.
+- **`index()`**: Interface de configuração.
+- **`webhook()`**: Recebe eventos do WAHA e aciona o bot.
 
-### 1. `send_message(chat_id, text)`
-Sends a message to a specified chat ID.
-- **Parameters**:
-  - `chat_id`: The ID of the chat.
-  - `text`: The message text.
-- **Usage**: Sends a POST request to the WhatsServer API.
+### `myagents.py` (agente Arthur e integração MCP)
+- **`load_persisted_history(chat_id, max_msgs)`**: Lê histórico do log, incluindo nome, tipo e timestamp.
+- **`process_llm(mensagem, nome_remetente, remetente)`**: Monta contexto, chama o agente MCP e retorna resposta.
+- **Gerencia histórico em RAM para contexto conversacional.
+- **Monta o prompt do agente com instruções detalhadas e histórico recente.
 
-### 2. `send_seen(chat_id, message_id, participant)`
-Marks a message as "seen".
-- **Parameters**:
-  - `chat_id`: The ID of the chat.
-  - `message_id`: The ID of the message.
-  - `participant`: The participant ID.
-- **Usage**: Sends a POST request to the WhatsServer API.
+### `server.py` (ferramentas MCP)
+- Implementa integração com:
+  - **Google Drive**: listar, buscar, obter link, criar pastas, enviar e deletar arquivos.
+  - **Gmail**: buscar, ler e enviar e-mails.
+  - **Google Calendar**: listar, criar e obter eventos.
+  - **Clima**: previsão e condições atuais.
+  - **WhatsApp**: enviar mensagens.
+  - **WebSearchTool**: busca na web.
+- Cada ferramenta é exposta como função MCP, usada automaticamente pelo agente conforme o contexto.
 
-### 3. `typing(chat_id, seconds)`
-Simulates typing in a chat.
-- **Parameters**:
-  - `chat_id`: The ID of the chat.
-  - `seconds`: Duration of typing simulation.
-- **Usage**: Sends start and stop typing requests to the WhatsServer API.
+### `logs/`
+- Armazena logs de conversas em JSON, incluindo nome do remetente, tipo, timestamp, mensagem e resposta.
 
-### 4. `load_allowed_contacts()`
-Loads the list of allowed contacts from a file.
-- **Returns**: A list of allowed contacts.
-- **Usage**: Reads `allowed_contacts.txt` and parses contact information.
+---
 
-### 5. `save_allowed_contacts(contacts)`
-Saves the list of allowed contacts to a file.
-- **Parameters**:
-  - `contacts`: List of contacts to save.
-- **Usage**: Writes contact information to `allowed_contacts.txt`.
+## 9. Observações
 
-### 6. `load_config()`
-Loads the global configuration from a file.
-- **Returns**: A dictionary containing configuration settings.
-- **Usage**: Reads `config.txt` and parses key-value pairs.
+- O bot responde como Arthur, de forma direta e sem formalidades.
+- O histórico recente é usado para contexto, mas a resposta é sempre para a última mensagem recebida.
+- O projeto é modular: você pode adicionar novas ferramentas MCP facilmente.
+- Todas as configurações e contatos são salvos em arquivos simples para fácil edição.
 
-### 7. `save_config(config)`
-Saves the global configuration to a file.
-- **Parameters**:
-  - `config`: Dictionary containing configuration settings.
-- **Usage**: Writes key-value pairs to `config.txt`.
+---
 
-### 8. `get_log_filename(contact)`
-Generates the log filename for a specific contact.
-- **Parameters**:
-  - `contact`: Contact ID.
-- **Returns**: Path to the log file.
-- **Usage**: Constructs the log file path using the contact ID.
+## 10. Dicas
 
-### 9. `reconstruir_historico(contact)`
-Reconstructs the conversation history for a contact.
-- **Parameters**:
-  - `contact`: Contact ID.
-- **Returns**: A list of conversation history.
-- **Usage**: Reads the log file and extracts the last 5 interactions.
+- Para rodar em produção, utilize um serviço como `systemd` ou `supervisor` para manter o bot ativo.
+- Certifique-se de liberar a porta 3000 no firewall para receber webhooks do WAHA.
+- Consulte os logs em `logs/` para depuração e histórico de conversas.
 
-### 10. `responder_whatsapp(mensagem, nome_remetente)`
-Generates a response for a WhatsApp message using OpenAI.
-- **Parameters**:
-  - `mensagem`: The received message.
-  - `nome_remetente`: Name of the sender.
-- **Returns**: Generated response text.
-- **Usage**: Uses OpenAI API to generate a response based on conversation history.
+---
 
-### 11. `index()`
-Handles the main configuration interface.
-- **Methods**: `GET`, `POST`
-- **Usage**: Updates global settings, manages allowed contacts, and displays logs.
+## 11. Créditos
 
-### 12. `webhook()`
-Processes incoming webhook events.
-- **Methods**: `POST`
-- **Usage**: Handles incoming messages, checks authorization, and generates responses.
-
-## Notes
-- The project uses Flask for web routing and OpenAI for generating responses.
-- Configuration and contact management are file-based.
-- Logs are stored in JSON format for easy processing.
+Projeto desenvolvido para integração avançada de WhatsApp com agentes MCP e múltiplas ferramentas
