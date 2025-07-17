@@ -285,7 +285,7 @@ def webhook():
         send_message(chat_id=chat_id, text=f"🤖: {resposta}")
         log_entry["assistant_response"] = resposta
     else:
-        resposta = "Respostas desabilitadas ou remetente não autorizado."
+        resposta = ""
         log_entry["assistant_response"] = resposta
 
     # grava no log por contato

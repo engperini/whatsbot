@@ -5,6 +5,8 @@ from agents import Agent, Runner, gen_trace_id, trace, WebSearchTool
 from agents.model_settings import ModelSettings
 from agents.mcp import MCPServerStdio
 
+
+
 # Diretório de logs persistidos
 LOG_FOLDER = "logs"
 
@@ -86,6 +88,12 @@ async def process_llm(mensagem: str, nome_remetente: str, remetente: str):
             "- Clima: previsão e condições atuais de qualquer cidade.\n"
             "- WhatsApp: enviar mensagens para qualquer número autorizado.\n"
             "- WebSearchTool: pesquisar informações ou definições na web.\n"
+            "- search_brain: buscar informações relevantes em arquivos, históricos de WhatsApp, e-mails e documentos indexados.\n"
+            "- build_vector_index: (uso restrito) atualizar ou reconstruir a base de conhecimento vetorial quando solicitado.\n"
+
+            "Use a ferramenta 'search_brain' sempre que precisar buscar mensagens anteriores, documentos especificos que não estejam no contexto recente da conversa. "
+            "Não use a função 'build_vector_index' automaticamente — só execute quando explicitamente solicitado pelo usuário, como 'Atualize a base vetorial' ou 'Reindexe os arquivos para memoria'. "
+
             "Se a resposta exigir dados atualizados, operações em arquivos, eventos, e-mails, clima ou pesquisas, use a ferramenta apropriada. "
             "Se não precisar de ferramenta, responda com seu próprio conhecimento. "
             "Você pode receber mensagens de texto, transcrições de áudio ou descrições de imagens (já processadas por um descritor). "
@@ -133,12 +141,12 @@ async def process_llm(mensagem: str, nome_remetente: str, remetente: str):
         #print(conversation_history[remetente])
 
         # Grava interação no log persistido para futuras sessões
-        os.makedirs(LOG_FOLDER, exist_ok=True)
-        log_file = os.path.join(LOG_FOLDER, f"messages_{remetente}.log")
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps({
-                "user_message": mensagem,
-                "assistant_response": response_text
-            }, ensure_ascii=False) + "\n")
+        # os.makedirs(LOG_FOLDER, exist_ok=True)
+        # log_file = os.path.join(LOG_FOLDER, f"messages_{remetente}.log")
+        # with open(log_file, "a", encoding="utf-8") as f:
+        #     f.write(json.dumps({
+        #         "user_message": mensagem,
+        #         "assistant_response": response_text
+        #     }, ensure_ascii=False) + "\n")
 
         return response_text

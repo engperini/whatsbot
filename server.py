@@ -20,6 +20,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
+# LlamaIndex imports vector store
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
+import glob
+from llama_index.embeddings.openai import OpenAIEmbedding
 
 load_dotenv()
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
@@ -363,11 +367,94 @@ async def download_drive_file(file_id: str) -> str:
 
 # ------------------------- End Google Drive Service -------------------------
 
+# --------------------------- MCP Dynamic Resource -------------------------
+
 # Add a dynamic greeting resource
 @mcp.resource("greeting://{name}")
 def get_greeting(name: str) -> str:
     """Get a personalized greeting"""
     return f"Hello, {name}!"
+
+# --------------------------- End MCP Dynamic Resource -------------------------
+
+# -----------------vector store second brain service ---------------------------
+
+
+VECTOR_STORE_DIR = "vector_store"
+DATA_DIR = "data"  # coloque aqui logs, emails, pdfs, etc.
+
+@mcp.tool()
+async def build_vector_index(full: bool = True) -> str:
+    """
+    (Uso restrito/manual) Indexa arquivos da base de conhecimento vetorial.
+
+    Esta ferramenta constrói ou atualiza o índice vetorial a partir dos arquivos presentes em DATA_DIR (como logs, e-mails, PDFs, etc).
+    - Use full=True para reindexar tudo do zero (apaga e recria o índice).
+    - Use full=False para indexação incremental (apenas novos arquivos).
+
+    ATENÇÃO: Esta função pode consumir recursos e gerar custos (caso use embeddings online).
+    NÃO utilize esta ferramenta automaticamente. Só execute quando explicitamente solicitado pelo usuário, por exemplo: "Atualize a base vetorial" ou "Reindexe meus arquivos".
+
+    Parâmetros:
+    - full: Se True, reindexa tudo do zero. Se False, faz atualização incremental.
+
+    Retorna um resumo da operação de indexação realizada.
+    """
+
+    embeddings = OpenAIEmbedding(model_name="text-embedding-ada-002") #add this line, if you are using openai models
+
+    if full or not os.path.exists(VECTOR_STORE_DIR):
+        # Indexação do zero
+        reader = SimpleDirectoryReader(input_dir=DATA_DIR, recursive=True)
+        docs = reader.load_data()
+        print(f"Indexando {len(docs)} documentos...")
+        index = VectorStoreIndex.from_documents(docs, embeddings=embeddings)
+        index.storage_context.persist(VECTOR_STORE_DIR)
+        return f"Indexação completa: {len(docs)} documentos indexados."
+    else:
+        # Incremental: só adiciona novos arquivos
+        index = load_index_from_storage(StorageContext.from_defaults(persist_dir=VECTOR_STORE_DIR))
+        indexed_files = set(index.docstore.docs.keys())
+        all_files = glob.glob(os.path.join(DATA_DIR, "**"), recursive=True)
+        new_files = [f for f in all_files if os.path.isfile(f) and os.path.basename(f) not in indexed_files]
+        if not new_files:
+            return "Nenhum arquivo novo para indexar."
+        reader = SimpleDirectoryReader(input_files=new_files)
+        docs = reader.load_data()
+        index.insert_documents(docs, embeddings=embeddings)
+        index.storage_context.persist(VECTOR_STORE_DIR)
+        return f"Indexação incremental: {len(docs)} novos documentos adicionados."
+
+@mcp.tool()
+async def search_brain(query: str, top_k: int = 5) -> str:
+    """
+    Busca informações relevantes em toda a base de conhecimento historico, incluindo logs de WhatsApp, e-mails, arquivos, PDFs e outros documentos indexados.
+    
+    Use esta ferramenta quando a resposta à pergunta do usuário exigir informações que não estão no contexto recente da conversa, ou quando for necessário recuperar fatos, mensagens antigas, documentos, e-mails ou qualquer dado previamente armazenado na base vetorial.
+    
+    Parâmetros:
+    - query: Pergunta ou termo a ser buscado semanticamente na base de conhecimento.
+    - top_k: Número máximo de resultados relevantes a retornar (padrão: 5).
+    
+    O log de whatsApp contem:
+    "from": número do remetente (quem enviou a mensagem)
+    "from_name": nome do remetente conforme salvo na agenda
+    "to": número de destino (normalmente o número do bot)
+    "type": tipo da mensagem (neste caso, "chat" significa mensagem de texto)
+    "user_message": conteúdo da mensagem enviada pelo usuário
+    "assistant_response": resposta enviada pelo assistente (se ainda não respondeu, fica vazio)
+    "timestamp": data e hora da mensagem recebida
+
+    Retorna um resumo dos textos/documentos mais relevantes encontrados.
+
+    """
+    index = load_index_from_storage(StorageContext.from_defaults(persist_dir=VECTOR_STORE_DIR))
+    retriever = index.as_retriever(similarity_top_k=top_k)
+    results = retriever.retrieve(query)
+    return "\n---\n".join([r.text for r in results])
+
+
+# ...end of vector store service...
 
 if __name__ == "__main__":
 
