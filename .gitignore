@@ -16,6 +16,8 @@ eggs/
 .idea/
 .vscode/
 *.log
+*.json
+data/
 allowed_contacts.txt
 token.json
 cal_token.json
